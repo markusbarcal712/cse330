@@ -5,6 +5,8 @@
 #include <string.h>
 #include <signal.h>
 
+#define RCX_INDEX 13
+
 char* devname = "/dev/memalloc";
 int   devfd = -1;
 
@@ -24,6 +26,8 @@ bool open_device_driver(void) {
 void segfault_handler(int nSignum, siginfo_t* si, void* vcontext) {
     printf("Caught: Segmentation Fault.\n");
 
+    ucontext_t* context = (ucontext_t*)vcontext;
+    
 #if defined(__x86_64)
     printf("Address: %p\n", (void*) context->uc_mcontext.gregs[RCX_INDEX]);
 #elif defined(__aarch64__)
