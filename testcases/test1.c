@@ -14,7 +14,7 @@
 
 /* 
  * Description:
- * This test checks if allocation to a previously-mapped page is correctly
+ * This test checks if allocation(s) to a previously-mapped page is correctly
  * handled by the kernel module.
  */
 
@@ -27,8 +27,44 @@ bool test_allocate(void){
     allocCall->num_pages            = 1;
     allocCall->write                = true;
     if (ioctl(devfd, ALLOCATE, allocCall) != -1) {
-        return false;
+        printf ("Failed at %p\n", &main);
+    	return false;
     }
+
+    int iter=10;
+    char *ptr;
+    while (iter>0) {
+	ptr = mmap ( NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
+	if (ptr == MAP_FAILED) {
+		// Should not happen, just added for sanity
+		printf("Something went terribly wrong! (Re-RUN?)\n");
+		assert(false);
+	}
+	// must access for on-demand paging
+	*ptr = 'a';
+
+	printf("Testing mapped page %p\n", ptr);
+    	allocCall->vaddr                = (unsigned long) ptr;
+    	allocCall->num_pages            = 1;
+    	allocCall->write                = true;
+    	if (ioctl(devfd, ALLOCATE, allocCall) != -1) {
+        	printf ("Failed at %p\n", ptr);
+		return false;
+    	}
+	iter--;
+    }
+
+    // unmap and now allocate
+    munmap(ptr, 0x1000);	
+    printf("Testing unmapped page %p\n", ptr);
+    allocCall->vaddr                = (unsigned long) ptr;
+    allocCall->num_pages            = 1;
+    allocCall->write                = true;
+    if (ioctl(devfd, ALLOCATE, allocCall) == -1) {
+        printf ("Failed at %p\n", ptr);
+	return false;
+    }
+
     return true;
 }
 
@@ -38,7 +74,7 @@ int main(void)
 
     if (!open_device_driver()) return -1;
     
-    if(!test_allocate()) {
+    if(test_allocate()) {
     	printf("Passed: TEST1\n");
         return -1;
     }
